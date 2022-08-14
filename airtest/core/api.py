@@ -6,8 +6,8 @@ import os
 import time
 
 from six.moves.urllib.parse import parse_qsl, urlparse
-
-from airtest.core.cv import Template, loop_find, try_log_screen
+from airtest.core.cv import Template, loop_find, try_log_screen ,my_loop_find
+# from airtest.core.cv import Template, loop_find, try_log_screen ,my_loop_find
 from airtest.core.error import TargetNotFoundError
 from airtest.core.settings import Settings as ST
 from airtest.utils.compat import script_log_dir
@@ -615,6 +615,18 @@ def exists(v):
     """
     try:
         pos = loop_find(v, timeout=ST.FIND_TIMEOUT_TMP)
+    except TargetNotFoundError:
+        return False
+    else:
+        return pos
+
+def myExists(v,algorithm = None,timeout=ST.FIND_TIMEOUT_TMP):
+    try:
+        pos = None
+        if not algorithm:
+            pos = loop_find(v, timeout)
+        else:
+            pos = my_loop_find(v,algorithm = algorithm,timeout = timeout)
     except TargetNotFoundError:
         return False
     else:

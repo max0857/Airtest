@@ -5,6 +5,7 @@ import re
 import time
 import base64
 import traceback
+import binascii
 import wda
 import inspect
 from functools import wraps
@@ -359,8 +360,11 @@ class IOS(Device):
             as response data is now jpg format in mid quality
         """
         value = self.driver.http.get('screenshot').value
-        raw_value = base64.b64decode(value)
-        return raw_value
+        try:
+            raw_value = base64.b64decode(value)
+            return raw_value
+        except binascii.Error:
+            return None
 
     def snapshot(self, filename=None, quality=10, max_size=None):
         """

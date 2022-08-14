@@ -81,7 +81,32 @@ def loop_find(query, timeout=ST.FIND_TIMEOUT, threshold=None, interval=0.5, inte
         else:
             time.sleep(interval)
 
+def my_loop_find(query,algorithm = None,timeout=ST.FIND_TIMEOUT, threshold=None, interval=0.5, intervalfunc=None):
+    
+    G.LOGGING.info("Try finding: %s", query)
+    start_time = time.time()
+    while True:
+        screen = G.DEVICE.snapshot(filename=None, quality=ST.SNAPSHOT_QUALITY)
 
+        if screen is None:
+            G.LOGGING.warning("Screen is None, may be locked")
+        else:
+            if threshold:
+                query.threshold = threshold
+            match_pos = query.my_match_in(screen,algorithm)
+            if match_pos:
+                try_log_screen(screen)
+                return match_pos
+
+        if intervalfunc is not None:
+            intervalfunc()
+
+        # 超时则raise，未超时则进行下次循环:
+        if (time.time() - start_time) > timeout:
+            try_log_screen(screen)
+            raise TargetNotFoundError('Picture %s not found in screen' % query)
+        else:
+            time.sleep(interval)
 @logwrap
 def try_log_screen(screen=None, quality=None, max_size=None):
     """
@@ -170,6 +195,34 @@ class Template(object):
         image = self._resize_image(ori_image, screen, ST.RESIZE_METHOD)
         ret = None
         for method in ST.CVSTRATEGY:
+            # get function definition and execute:
+            func = MATCHING_METHODS.get(method, None)
+            if func is None:
+                raise InvalidMatchingMethodError("Undefined method in CVSTRATEGY: '%s', try 'kaze'/'brisk'/'akaze'/'orb'/'surf'/'sift'/'brief' instead." % method)
+            else:
+                if method in ["mstpl", "gmstpl"]:
+                    ret = self._try_match(func, ori_image, screen, threshold=self.threshold, rgb=self.rgb, record_pos=self.record_pos,
+                                            resolution=self.resolution, scale_max=self.scale_max, scale_step=self.scale_step)
+                else:
+                    ret = self._try_match(func, image, screen, threshold=self.threshold, rgb=self.rgb)
+            if ret:
+                break
+        return ret
+
+    def my_match_in(self, screen,algorithm):
+        match_result = self._my_cv_match(screen,algorithm)
+        G.LOGGING.debug("match result: %s", match_result)
+        if not match_result:
+            return None
+        focus_pos = TargetPos().getXY(match_result, self.target_pos)
+        return focus_pos
+
+    def _my_cv_match(self, screen,algorithm):
+        # in case image file not exist in current directory:
+        ori_image = self._imread()
+        image = self._resize_image(ori_image, screen, ST.RESIZE_METHOD)
+        ret = None
+        for method in algorithm:
             # get function definition and execute:
             func = MATCHING_METHODS.get(method, None)
             if func is None:
